@@ -1,8 +1,4 @@
 # jacananeurogenomics
-R script for jacana neurogenomics project - DESeq2 and WGCNA
+This repo contains code for the entire Jacana Neurogenomics project RNAseq pipeline.
 
-DESeq2 script for 3 dyads (females vs courting males, females vs parenting males, and parenting males vs courting males) in 2 different brain regions (POA and TnA).
-
-WGCNA script for each brain region using traits measured in the field. Overall patterns of gene expression associated with some behavioral and phenotypic traits. 
-
-Input files are .csv. Counts_with_egenes files are needed for DESeq2 and WGCNA. TraitData is needed for WGCNA. SexStageInfo is needed for DESeq2.
+Each subdirectory contains the input files needed to run the scripts.
