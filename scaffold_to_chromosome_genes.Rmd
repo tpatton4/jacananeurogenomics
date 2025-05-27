@@ -1,0 +1,347 @@
+---
+title: "Scaffolds to Chromosomes"
+author: "Tessa Patton"
+date: "2025-05-19"
+output: html_document
+---
+Figuring out which scaffolds from the hifi genome align with which jacana scaffolds (oriented using the zebra finch reference genome)
+
+```{r}
+ragtag <- read.table("zebra_finch.ragtag.scaffold.agp.txt") #saved agp file as txt for easier read in R
+head(ragtag)
+
+#filtered <- ragtag[ragtag$V6 != 100, ] #remove rows where column 6 is equal to 100 (those are gaps)
+```
+
+
+Subset data to include only rows where column 6 is equal to a scaffold ID that was pulled out during depth of coverage analyses
+```{r}
+colnames(ragtag)
+library(dplyr)
+ragtag <- ragtag %>% rename_with(trimws) #need to assign column names that dplyr can recognize (V1, V2, etc. were not real column names, so assigning here)
+
+scaffolds <- ragtag |>
+  filter(V6 %in% c(
+    "h1tg000195l", "h1tg000107l", "h1tg000118l", "h1tg000027l",
+    "h1tg000079l", "h1tg000138l", "h1tg000156l", "h1tg000127l",
+    "h1tg000048l", "h1tg000110l", "h1tg000170l", "h1tg000025l",
+    "h1tg000273l", "h1tg000011l", "h1tg000065l", "h1tg000133l",
+    "h1tg000152l", "h1tg000145l", "h1tg000148l", "h1tg000052l",
+    "h1tg000024l", "h1tg000039l", "h1tg000242l", "h1tg000159l",
+    "h1tg000252l", "h1tg000070l"
+  )) #col 6 is a scaffold name or '100' which is a gap. Now only relevant scaffolds remain
+
+```
+
+Now filter so that we only have rows with scaffolds that aligned to the Z with the re-oriented jacana genome
+
+```{r}
+Zscafftable <- scaffolds[scaffolds$V1 == "chr_Z", ] #keep rows where column 1 is equal to chr_Z
+```
+
+
+Now figure out which genes are on those scaffolds using the original gff file
+```{r}
+gff <- read.csv("Jacana_from_gallus_gallus_gff.csv.csv")
+
+Zscaffs <-  Zscafftable$V6
+genesgff <- gff |> 
+  filter(seqid %in% Zscaffs) #all of the rows from the gff where the seqID is a scaffold on the jacana Z
+
+```
+
+Use strdetect to connect gene names to the mess in the attributes column
+```{r}
+library(stringr)
+allcounts <- read.csv("jacana_counts_genenames_8FEB24.csv")
+allgenes <- allcounts$Gene.stable.ID
+pattern <- paste(allgenes, collapse="|")#regex pattern to use to match any ensemblID
+
+filtered <- genesgff |> 
+  filter(str_detect(attributes, pattern) & type == 'gene') #look in the attributes column of the gff 
+
+library(tidyr)
+genenames_cleaned <- filtered %>%
+  mutate(Info_split = strsplit(as.character(attributes), ";")) %>% 
+  unnest(Info_split) %>%
+  separate(Info_split, into = c("Key", "Value"), sep = "=", fill = "right") %>% #split the attributes column into keys and values that will become their own columns
+  pivot_wider(names_from = Key, values_from = Value)
+
+Zgenenames <- genenames_cleaned$Name #this is a list of genes that are on the scaffolds found through depth of coverage AND are on the new jacana Z chromosome
+Zgenenames <- Zgenenames[!is.na(Zgenenames)] #remove NA values for gene names that do not match both 
+
+write.csv(Zgenenames, "zgenenames.csv") #yippee!
+```
+
+Determine whether these genes comprise much of the DEG list for each dyad
+```{r}
+FvMP_POA <- read.csv("jacanaPOA_FvMP_DESeq2Out_6MAR25.csv")
+FvMP_POA_Z <- FvMP_POA[FvMP_POA$Gene.name %in% Zgenenames, ]
+nrow(FvMP_POA_Z)/nrow(FvMP_POA) #0.6358792
+
+FvMC_POA <- read.csv("jacanaPOA_FvMC_DESeq2Out_6MAR25.csv")
+FvMC_POA_Z <- FvMC_POA[FvMC_POA$Gene.name %in% Zgenenames, ]
+nrow(FvMC_POA_Z)/nrow(FvMC_POA) #0.5204856
+
+FvMP_TnA <- read.csv("jacanaTnA_FvMP_DESeq2Out_6MAR25.csv")
+FvMP_TnA_Z <- FvMP_TnA[FvMP_TnA$Gene.name %in% Zgenenames, ]
+nrow(FvMP_TnA_Z)/nrow(FvMP_TnA) #0.625
+
+FvMC_TnA <- read.csv("jacanaTnA_FvMC_DESeq2Out_6MAR25.csv")
+FvMC_TnA_Z <- FvMC_TnA[FvMC_TnA$Gene.name %in% Zgenenames, ]
+nrow(FvMC_TnA_Z)/nrow(FvMC_TnA) #0.6262626
+
+MCvMP_POA <- read.csv("jacanaPOA_MCvMP_Deseq2Out_6MAR25.csv")
+MCvMP_POA_Z <- MCvMP_POA[MCvMP_POA$Gene.name %in% Zgenenames, ]
+nrow(MCvMP_POA_Z)/nrow(MCvMP_POA) #0
+
+```
+
+Use these lists of genes and DESeq2 output to make volcano plots with Z genes highlighted
+```{r}
+library(ggplot2)
+#load in allgenes files - we want non-significant genes in here, too!
+
+# F v MP in POA #
+
+allFvMP_POA <- read.csv("jacanaPOAallgenes_FvMP_DESeq2_16FEB25.csv")
+
+allFvMP_POA <- allFvMP_POA[!is.na(allFvMP_POA$log2FoldChange) & !is.na(allFvMP_POA$padj), ] #get rid of genes that have NA values for log2FoldChange and adjusted p value
+range(allFvMP_POA$log2FoldChange)
+range(-log10(allFvMP_POA$padj))
+
+
+# Create the plot
+with(
+  allFvMP_POA,
+  plot(
+    log2FoldChange,
+    -log10(padj),
+    pch = 19,
+    main = "Females vs Parenting Males POA",
+    cex = 0.7,
+    xlab = bquote(~Log[2]~fold~change),
+    ylab = bquote(~-log[10]~P~value),
+    xlim = c(-3, 13),
+    ylim = c(-1, 210)
+  )
+)
+
+# Add lines for cut-offs
+abline(h = -log10(0.05), col = "black", lty = 3, lwd = 1)
+abline(v=-0.5, col="black", lty=3, lwd=1)
+abline(v=0.5, col="black", lty=3, lwd=1)
+
+#color genes on the Z in grey
+with(subset(allFvMP_POA, Gene.name %in% Zgenenames), points(log2FoldChange, -log10(padj), pch=21, col="darkgoldenrod1", cex=0.75))
+
+#color significant genes based on whether they were up- or down-regulated
+with(subset(allFvMP_POA, padj<0.05 & log2FoldChange< -0.5 & !Gene.name %in% Zgenenames), points(log2FoldChange, -log10(padj), pch=19, col="blue", cex=0.7))
+with(subset(allFvMP_POA, padj<0.05 & log2FoldChange>0.5), points(log2FoldChange, -log10(padj), pch=19, col="red", cex=0.7))
+
+# F v MC in POA #
+
+allFvMC_POA <- read.csv("jacanaPOAallgenes_FvMC_DESeq2_16FEB25.csv")
+
+allFvMC_POA <- allFvMC_POA[!is.na(allFvMC_POA$log2FoldChange) & !is.na(allFvMC_POA$padj), ] #get rid of genes that have NA values for log2FoldChange and adjusted p value
+range(allFvMC_POA$log2FoldChange)
+range(-log10(allFvMC_POA$padj))
+
+
+# Create the plot
+with(
+  allFvMC_POA,
+  plot(
+    log2FoldChange,
+    -log10(padj),
+    pch = 19,
+    main = "Females vs Courting Males POA",
+    cex = 0.7,
+    xlab = bquote(~Log[2]~fold~change),
+    ylab = bquote(~-log[10]~P~value),
+    xlim = c(-3, 13),
+    ylim = c(-1, 210)
+  )
+)
+
+# Add lines for cut-offs
+abline(h = -log10(0.05), col = "black", lty = 3, lwd = 1)
+abline(v=-0.5, col="black", lty=3, lwd=1)
+abline(v=0.5, col="black", lty=3, lwd=1)
+
+#color genes on the Z in grey
+with(subset(allFvMC_POA, Gene.name %in% Zgenenames), points(log2FoldChange, -log10(padj), pch=21, col="darkgoldenrod1",bg=NA, cex=0.75))
+
+#color significant genes based on whether they were up- or down-regulated
+with(subset(allFvMC_POA, padj<0.05 & log2FoldChange< -0.5 & !Gene.name %in% Zgenenames), points(log2FoldChange, -log10(padj), pch=19, col="skyblue", cex=0.7))
+with(subset(allFvMC_POA, padj<0.05 & log2FoldChange>0.5), points(log2FoldChange, -log10(padj), pch=19, col="red", cex=0.7))
+
+# F v MP in TnA #
+
+allFvMP_TnA <- read.csv("jacanaTnAallgenes_FvMP_DESeq2_16FEB25.csv")
+
+allFvMP_TnA <- allFvMP_TnA[!is.na(allFvMP_TnA$log2FoldChange) & !is.na(allFvMP_TnA$padj), ] #get rid of genes that have NA values for log2FoldChange and adjusted p value
+range(allFvMP_TnA$log2FoldChange)
+range(-log10(allFvMP_TnA$padj))
+
+
+# Create the plot
+with(
+  allFvMP_TnA,
+  plot(
+    log2FoldChange,
+    -log10(padj),
+    pch = 19,
+    main = "Females vs Parenting Males TnA",
+    cex = 0.7,
+    xlab = bquote(~Log[2]~fold~change),
+    ylab = bquote(~-log[10]~P~value),
+    xlim = c(-3, 13),
+    ylim = c(-1, 210)
+  )
+)
+
+# Add lines for cut-offs
+abline(h = -log10(0.05), col = "black", lty = 3, lwd = 1)
+abline(v=-0.5, col="black", lty=3, lwd=1)
+abline(v=0.5, col="black", lty=3, lwd=1)
+
+#color genes on the Z in grey
+with(subset(allFvMP_POA, Gene.name %in% Zgenenames), points(log2FoldChange, -log10(padj), pch=21, col="darkgoldenrod1", cex=0.75))
+
+#color significant genes based on whether they were up- or down-regulated
+with(subset(allFvMP_TnA, padj<0.05 & log2FoldChange< -0.5 & !Gene.name %in% Zgenenames), points(log2FoldChange, -log10(padj), pch=19, col="blue", cex=0.7))
+with(subset(allFvMP_TnA, padj<0.05 & log2FoldChange>0.5), points(log2FoldChange, -log10(padj), pch=19, col="red", cex=0.7))
+
+# F v MC in TnA #
+
+allFvMC_TnA <- read.csv("jacanaTnAallgenes_FvMC_DESeq2_16FEB25.csv")
+
+allFvMC_TnA <- allFvMC_TnA[!is.na(allFvMC_TnA$log2FoldChange) & !is.na(allFvMC_TnA$padj), ] #get rid of genes that have NA values for log2FoldChange and adjusted p value
+range(allFvMC_TnA$log2FoldChange)
+range(-log10(allFvMC_TnA$padj))
+
+
+# Create the plot
+with(
+  allFvMC_TnA,
+  plot(
+    log2FoldChange,
+    -log10(padj),
+    pch = 19,
+    main = "Females vs Courting Males TnA",
+    cex = 0.7,
+    xlab = bquote(~Log[2]~fold~change),
+    ylab = bquote(~-log[10]~P~value),
+    xlim = c(-3, 13),
+    ylim = c(-1, 210)
+  )
+)
+
+# Add lines for cut-offs
+abline(h = -log10(0.05), col = "black", lty = 3, lwd = 1)
+abline(v=-0.5, col="black", lty=3, lwd=1)
+abline(v=0.5, col="black", lty=3, lwd=1)
+
+#color genes on the Z in grey
+with(subset(allFvMC_POA, Gene.name %in% Zgenenames), points(log2FoldChange, -log10(padj), pch=21, col="darkgoldenrod1", cex=0.75))
+
+#color significant genes based on whether they were up- or down-regulated
+with(subset(allFvMC_TnA, padj<0.05 & log2FoldChange< -0.5 & !Gene.name %in% Zgenenames), points(log2FoldChange, -log10(padj), pch=19, col="skyblue", cex=0.7))
+with(subset(allFvMC_TnA, padj<0.05 & log2FoldChange>0.5), points(log2FoldChange, -log10(padj), pch=19, col="red", cex=0.7))
+
+# MP v MC in POA #
+
+allMPvMC_POA <- read.csv("jacanaPOAallgenes_MCvMP_DESeq2_16FEB25.csv")
+
+allMPvMC_POA <- allMPvMC_POA[!is.na(allMPvMC_POA$log2FoldChange) & !is.na(allMPvMC_POA$padj), ] #get rid of genes that have NA values for log2FoldChange and adjusted p value
+range(allMPvMC_POA$log2FoldChange)
+range(-log10(allMPvMC_POA$padj))
+
+
+# Create the plot
+with(
+  allMPvMC_POA,
+  plot(
+    log2FoldChange,
+    -log10(padj),
+    pch = 19,
+    main = "Courting vs Parenting Males POA",
+    cex = 0.7,
+    xlab = bquote(~Log[2]~fold~change),
+    ylab = bquote(~-log[10]~P~value),
+    xlim = c(-3, 3),
+    ylim = c(-1, 10)
+  )
+)
+
+# Add lines for cut-offs
+abline(h = -log10(0.05), col = "black", lty = 3, lwd = 1)
+abline(v=-0.5, col="black", lty=3, lwd=1)
+abline(v=0.5, col="black", lty=3, lwd=1)
+
+#color genes on the Z in grey
+with(subset(allMPvMC_POA, Gene.name %in% Zgenenames), points(log2FoldChange, -log10(padj), pch=21, col="darkgoldenrod1", cex=0.75))
+
+#color significant genes based on whether they were up- or down-regulated
+with(subset(allMPvMC_POA, padj<0.05 & log2FoldChange< -0.5 & !Gene.name %in% Zgenenames), points(log2FoldChange, -log10(padj), pch=19, col="blue", cex=0.7))
+with(subset(allMPvMC_POA, padj<0.05 & log2FoldChange>0.5), points(log2FoldChange, -log10(padj), pch=19, col="skyblue", cex=0.7))
+```
+
+
+Need to check whether dots have already been assigned a color when adding the orange outline
+```{r}
+
+allFvMC_POA <- read.csv("jacanaPOAallgenes_FvMC_DESeq2_16FEB25.csv")
+
+# Remove rows with NA values for log2FoldChange and adjusted p-value
+allFvMC_POA <- allFvMC_POA[!is.na(allFvMC_POA$log2FoldChange) & !is.na(allFvMC_POA$padj), ]
+
+# Create the plot
+with(
+  allFvMC_POA,
+  plot(
+    log2FoldChange,
+    -log10(padj),
+    pch = 19,
+    main = "Females vs Courting Males POA",
+    cex = 0.7,
+    xlab = bquote(~Log[2]~fold~change),
+    ylab = bquote(~-log[10]~P~value),
+    xlim = c(-3, 13),
+    ylim = c(-1, 210)
+  )
+)
+
+# Add lines for cut-offs
+abline(h = -log10(0.05), col = "black", lty = 3, lwd = 1)
+abline(v = -0.5, col = "black", lty = 3, lwd = 1)
+abline(v = 0.5, col = "black", lty = 3, lwd = 1)
+
+# Plot significant genes within the thresholds
+with(subset(allFvMC_POA, padj < 0.05 & log2FoldChange < -0.5 & !Gene.name %in% Zgenenames), 
+     points(log2FoldChange, -log10(padj), pch = 19, col = "skyblue", cex = 0.7))
+
+with(subset(allFvMC_POA, padj < 0.05 & log2FoldChange > 0.5 & !Gene.name %in% Zgenenames), 
+     points(log2FoldChange, -log10(padj), pch = 19, col = "red", cex = 0.7))
+
+# Add orange outlines for Zgenenames
+with(
+  subset(allFvMC_POA, Gene.name %in% Zgenenames),
+  points(
+    log2FoldChange,
+    -log10(padj),
+    pch = 21, # Use a hollow point marker with an outline
+    col = "darkgoldenrod2", #outline
+    bg = ifelse(
+      log2FoldChange > 0.5 & padj < 0.05, "red", # Keep red fill
+      ifelse(
+        log2FoldChange < -0.5 & padj < 0.05, "skyblue", # Keep blue fill
+        NA # Otherwise no fill
+      )
+    ),
+    cex = 0.75
+  )
+)
+
+```
