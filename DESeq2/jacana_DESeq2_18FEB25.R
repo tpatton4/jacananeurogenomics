@@ -95,3 +95,198 @@ write.csv(sigcountsTnAFvMP, "jacanaTnA_FvMP_DESeq2Out_6MAR25.csv")
 write.csv(sigcountsTnAFvMC, "jacanaTnA_FvMC_DESeq2Out_6MAR25.csv")
 write.csv(sigcountsTnAMCvMP, "jacanaTnA_MCvMP_DESeq2Out_6MAR25.csv")
 
+# add a column for Z linked genes
+Z_POA_FvMP <- read.csv("jacana_POA_FvMP_Zlinked.csv")
+sigcounts_POAFvMP_Z <- sigcountsPOAFvMP |> 
+  mutate(Z_linked = sigcountsPOAFvMP$Gene.name %in% Z_POA_FvMP$Name)
+write.csv(sigcounts_POAFvMP_Z, "sigcounts_POAFvMP_Z_19MAR2025.csv")
+Z_POA_FvMC <- read.csv("jacana_POA_FvMC_Zlinked.csv")
+sigcounts_POAFvMC_Z <- sigcountsPOAFvMC |> 
+  mutate(Z_linked = sigcountsPOAFvMC$Gene.name %in% Z_POA_FvMC$Name)
+write.csv(sigcounts_POAFvMC_Z, "sigcounts_POAFvMC_Z_19MAR2025.csv")
+Z_TnA_FvMP <- read.csv("jacana_TnA_FvMP_Zlinked.csv")
+sigcounts_TnAFvMP_Z <- sigcountsTnAFvMP |> 
+  mutate(Z_linked = sigcountsTnAFvMP$Gene.name %in% Z_TnA_FvMP$Name)
+write.csv(sigcounts_TnAFvMP_Z, "sigcounts_TnAFvMP_Z_19MAR2025.csv")
+Z_TnA_FvMC <- read.csv("jacana_TnA_FvMC_Zlinked.csv")
+sigcounts_TnAFvMC_Z <- sigcountsTnAFvMC |> 
+  mutate(Z_linked = sigcountsTnAFvMC$Gene.name %in% Z_TnA_FvMC$Name)
+write.csv(sigcounts_TnAFvMC_Z, "sigcounts_TnAFvMC_Z_19MAR2025.csv")
+
+####Volcano Plots####
+#POA FvMP
+z_POAFvMP <-  read.csv("jacana_POA_FvMP_Zlinked.csv")
+z_POAFvMP <- z_POAFvMP$Name
+
+with(allgenesPOAFvMP, plot(log2FoldChange, -log10(padj), pch=19, main="Females vs Parenting Males POA", cex=0.7, xlab=bquote(~Log[2]~fold~change), ylab=bquote(~-log[10]~P~value), xlim=c(-3,13), ylim=c(-1,300)))
+
+#Add lines for cut-offs: logFC>0.5 and p-value cut-off at padj<0.05
+abline(h=-log10(0.05), col="black", lty=3, lwd=1)
+abline(v=-0.5, col="black", lty=3, lwd=1)
+abline(v=0.5, col="black", lty=3, lwd=1)
+
+#color genes on the Z in grey
+with(subset(allgenesPOAFvMP, Gene.name %in% z_POAFvMP), points(log2FoldChange, -log10(padj), pch=19, col="grey", cex=0.7))
+
+#color significant genes based on whether they were up- or down-regulated
+with(subset(allgenesPOAFvMP, padj<0.05 & log2FoldChange< -0.5 & !Gene.name %in% z_POAFvMP), points(log2FoldChange, -log10(padj), pch=19, col="blue", cex=0.7))
+with(subset(allgenesPOAFvMP, padj<0.05 & log2FoldChange>0.5), points(log2FoldChange, -log10(padj), pch=19, col="red", cex=0.7))
+
+
+#Add genes names to the significant genes using the code below. Try adjusting how many gene names are shown.
+#cutoff=sort(allgenesPOAFvMP$padj)[10] #selects the top 10 smallest p values
+#sign.genes=which(allgenesPOAFvMP$padj <= cutoff)
+#text(x=allgenesPOAFvMP$log2FoldChange[sign.genes] , y=-log10(allgenesPOAFvMP$padj[sign.genes]), label=allgenesPOAFvMP$Gene.name[sign.genes], cex=0.5)
+
+#FvMC POA
+with(allgenesPOAFvMC, plot(log2FoldChange, -log10(padj), pch=19, main="Females vs Courting Males POA", cex=0.7, xlab=bquote(~Log[2]~fold~change), ylab=bquote(~-log[10]~P~value), xlim=c(-3,13), ylim=c(-1,300)))
+
+#Add lines for cut-offs: logFC>0.5 and p-value cut-off at padj<0.05
+abline(h=-log10(0.05), col="black", lty=3, lwd=1)
+abline(v=-0.5, col="black", lty=3, lwd=1)
+abline(v=0.5, col="black", lty=3, lwd=1) 
+
+#color significant genes based on whether they were up- or down-regulated
+with(subset(allgenesPOAFvMC, padj<0.05 & log2FoldChange< -0.5), points(log2FoldChange, -log10(padj), pch=19, col="lightblue", cex=0.7))
+with(subset(allgenesPOAFvMC, padj<0.05 & log2FoldChange>0.5), points(log2FoldChange, -log10(padj), pch=19, col="red", cex=0.7))
+
+#Add genes names to the significant genes using the code below. Try adjusting how many gene names are shown.
+#cutoff=sort(allgenesFvMC$padj)[10] #selects the top 10 smallest p values
+#sign.genes=which(allgenesFvMC$padj <= cutoff)
+#text(x=allgenesFvMC$log2FoldChange[sign.genes] , y=-log10(allgenesFvMC$padj[sign.genes]), label=allgenesFvMC$Gene.name[sign.genes], cex=0.5)
+
+#MCvMP POA
+with(allgenesPOAMCvMP, plot(log2FoldChange, -log10(padj), pch=19, main="Courting vs Parenting Males POA", cex=0.7, xlab=bquote(~Log[2]~fold~change), ylab=bquote(~-log[10]~P~value), xlim=c(-3,3), ylim=c(0,5)))
+
+#Add lines for cut-offs: logFC>0.5 and p-value cut-off at padj<0.05
+abline(h=-log10(0.05), col="black", lty=3, lwd=1)
+abline(v=-0.5, col="black", lty=3, lwd=1)
+abline(v=0.5, col="black", lty=3, lwd=1)
+
+#color significant genes based on whether they were up- or down-regulated
+with(subset(allgenesPOAMCvMP, padj<0.05 & log2FoldChange< -0.5), points(log2FoldChange, -log10(padj), pch=19, col="blue", cex=0.7))
+with(subset(allgenesPOAMCvMP, padj<0.05 & log2FoldChange>0.5), points(log2FoldChange, -log10(padj), pch=19, col="lightblue", cex=0.7))
+
+#Add genes names to the significant genes using the code below. Try adjusting how many gene names are shown.
+#cutoff=sort(allgenesMCvMP$padj)[10] #selects the top 10 smallest p values
+#sign.genes=which(allgenesMCvMP$padj <= cutoff)
+#text(x=allgenesMCvMP$log2FoldChange[sign.genes] , y=-log10(allgenesMCvMP$padj[sign.genes]), label=allgenesMCvMP$Gene.name[sign.genes], cex=0.5)
+
+# F v MP TnA
+with(allgenesTnAFvMP, plot(log2FoldChange, -log10(padj), pch=19, main="Females vs Parenting Males TnA", cex=0.7, xlab=bquote(~Log[2]~fold~change), ylab=bquote(~-log[10]~P~value), xlim=c(-3,13), ylim=c(-1,300)))
+
+#Add lines for cut-offs: logFC>0.5 and p-value cut-off at padj<0.05
+abline(h=-log10(0.05), col="black", lty=3, lwd=1)
+abline(v=-0.5, col="black", lty=3, lwd=1)
+abline(v=0.5, col="black", lty=3, lwd=1)
+
+#color significant genes based on whether they were up- or down-regulated
+with(subset(allgenesTnAFvMP, padj<0.05 & log2FoldChange< -0.5), points(log2FoldChange, -log10(padj), pch=19, col="blue", cex=0.7))
+with(subset(allgenesTnAFvMP, padj<0.05 & log2FoldChange>0.5), points(log2FoldChange, -log10(padj), pch=19, col="tomato", cex=0.7))
+
+#Add genes names to the significant genes using the code below. Try adjusting how many gene names are shown.
+#cutoff=sort(allgenesFvMP$padj)[10] #selects the top 10 smallest p values
+#sign.genes=which(allgenesFvMP$padj <= cutoff)
+#text(x=allgenesFvMP$log2FoldChange[sign.genes] , y=-log10(allgenesFvMP$padj[sign.genes]), label=allgenesFvMP$Gene.name[sign.genes], cex=0.5)
+
+#FvMC TnA
+with(allgenesTnAFvMC, plot(log2FoldChange, -log10(padj), pch=19, main="Females vs Courting Males TnA", cex=0.7, xlab=bquote(~Log[2]~fold~change), ylab=bquote(~-log[10]~P~value), xlim=c(-3,13), ylim=c(-1,300)))
+
+#Add lines for cut-offs: logFC>0.5 and p-value cut-off at padj<0.05
+abline(h=-log10(0.05), col="black", lty=3, lwd=1)
+abline(v=-0.5, col="black", lty=3, lwd=1)
+abline(v=0.5, col="black", lty=3, lwd=1) 
+
+#color significant genes based on whether they were up- or down-regulated
+with(subset(allgenesTnAFvMC, padj<0.05 & log2FoldChange< -0.5), points(log2FoldChange, -log10(padj), pch=19, col="lightblue", cex=0.7))
+with(subset(allgenesTnAFvMC, padj<0.05 & log2FoldChange>0.5), points(log2FoldChange, -log10(padj), pch=19, col="tomato", cex=0.7))
+
+#Add genes names to the significant genes using the code below. Try adjusting how many gene names are shown.
+cutoff=sort(allgenesFvMC$padj)[10] #selects the top 10 smallest p values
+sign.genes=which(allgenesFvMC$padj <= cutoff)
+text(x=allgenesFvMC$log2FoldChange[sign.genes] , y=-log10(allgenesFvMC$padj[sign.genes]), label=allgenesFvMC$Gene.name[sign.genes], cex=0.5)
+
+#MCvMP TnA
+with(allgenesTnAMCvMP, plot(log2FoldChange, -log10(padj), pch=19, main="Courting vs Parenting Males TnA", cex=0.7, xlab=bquote(~Log[2]~fold~change), ylab=bquote(~-log[10]~P~value), xlim=c(-3,3), ylim=c(0,5)))
+
+#Add lines for cut-offs: logFC>0.5 and p-value cut-off at padj<0.05
+abline(h=-log10(0.05), col="black", lty=3, lwd=1)
+abline(v=-0.5, col="black", lty=3, lwd=1)
+abline(v=0.5, col="black", lty=3, lwd=1)
+
+#color significant genes based on whether they were up- or down-regulated
+with(subset(allgenesTnAMCvMP, padj<0.05 & log2FoldChange< -0.5), points(log2FoldChange, -log10(padj), pch=19, col="blue", cex=0.7))
+with(subset(allgenesTnAMCvMP, padj<0.05 & log2FoldChange>0.5), points(log2FoldChange, -log10(padj), pch=19, col="lightblue", cex=0.7))
+
+#Add genes names to the significant genes using the code below. Try adjusting how many gene names are shown.
+#cutoff=sort(allgenesMCvMP$padj)[10] #selects the top 10 smallest p values
+#sign.genes=which(allgenesMCvMP$padj <= cutoff)
+#text(x=allgenesMCvMP$log2FoldChange[sign.genes] , y=-log10(allgenesMCvMP$padj[sign.genes]), label=allgenesMCvMP$Gene.name[sign.genes], cex=0.5)
+
+
+
+
+#### Boxplots ####
+library(ggplot2)
+library(patchwork)
+gene <- "PRLR"
+genecounts <- as.data.frame(read.csv("jacana_POATnAcounts_14FEB24.csv", row.names="Gene.stable.ID"))
+P <- genecounts[genecounts$Gene.name == gene, ]
+P <- t(as.matrix(P, row.names=1))
+P <- P[2:49,]#get rid of gene name label
+P
+treat <- read.csv("jacana_allsamples_sexStageInfo.csv",header=TRUE,row.names=1)
+
+genemat <- merge(P, treat, by="row.names", all=TRUE)
+genemat <- as.data.frame(genemat)
+genemat$group <- paste(genemat$Brain.Region,genemat$SexStage,sep="_")
+genemat$x = as.numeric(as.character(genemat$x))#make numbers into numbers lol
+POA <- genemat[grepl("POA$",genemat[,1]), ]
+TnA <- genemat[grepl("TnA$",genemat[,1]), ]
+
+#ggplot(POA, aes(x=SexStage, y=x, fill=SexStage))+geom_boxplot(color="black", alpha=0.5)+geom_jitter(aes(color=SexStage),position = position_jitter(width = 0.2), shape = 16, size = 2, alpha = 1)+scale_color_manual(values=c("Female"="red","MaleP"="blue", "MaleC"="lightblue"))+scale_fill_manual(values = c("Female" = "red", MaleP="blue","MaleC" = "lightblue"))+labs(title=paste(gene,"Expression vs Sex"),subtitle="POA", x="Sex",y=paste(gene,"Expression"))+theme_minimal()+theme(plot.title=element_text(hjust=0.5),plot.subtitle = element_text(hjust=0.5),panel.grid.major=element_blank(),panel.grid.minor=element_blank(),axis.line=element_line(color="grey",linewidth=0.5))
+
+POA$SexStage <- factor(POA$SexStage, levels = c("Female", "MaleP", "MaleC"))
+TnA$SexStage <- factor(POA$SexStage, levels = c("Female", "MaleP", "MaleC"))
+
+Y_lim <- 300
+
+TnAplot <- ggplot(TnA, aes(x=SexStage, y=x, fill=SexStage)) +
+  geom_boxplot(color="black", alpha=0.5) +
+  geom_jitter(aes(color=SexStage), position = position_jitter(width = 0.2), shape = 16, size = 2, alpha = 1) +
+  scale_color_manual(values=c("Female"="red", "MaleP"="blue", "MaleC"="lightblue")) +
+  scale_fill_manual(values = c("Female" = "red", "MaleP" = "blue", "MaleC" = "lightblue")) +
+  labs(subtitle="TnA", x="Sex", y=paste(gene, "Expression")) +
+  coord_cartesian(ylim = c(0, Y_lim)) + # Ensure same y-axis limit
+  theme_minimal() +
+  theme(plot.title = element_text(hjust=0.5),
+        plot.subtitle = element_text(hjust=0.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(color="grey", linewidth=0.5))
+POAplot <- ggplot(POA, aes(x=SexStage, y=x, fill=SexStage)) +
+  geom_boxplot(color="black", alpha=0.5) +
+  geom_jitter(aes(color=SexStage), position = position_jitter(width = 0.2), shape = 16, size = 2, alpha = 1) +
+  scale_color_manual(values=c("Female"="red", "MaleP"="blue", "MaleC"="lightblue")) +
+  scale_fill_manual(values = c("Female" = "red", "MaleP" = "blue", "MaleC" = "lightblue")) +
+  labs(subtitle="POA", x="Sex", y=paste(gene, "Expression")) +
+  coord_cartesian(ylim = c(0, Y_lim)) + # Ensure same y-axis limit
+  theme_minimal() +
+  theme(plot.title = element_text(hjust=0.5),
+        plot.subtitle = element_text(hjust=0.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(color="grey", linewidth=0.5))
+plotp <- POAplot + TnAplot + plot_layout(guides="collect")
+plotp
+
+#library(rvg)
+#library(officer)
+editable_graph <- dml(ggobj = plotp)
+doc <- read_pptx("jacana_suppboxplots_14FEB25.pptx")
+doc <- add_slide(doc)
+doc <- ph_with(x = doc, editable_graph,
+               location = ph_location_type(type = "body") )
+print(doc, target = "jacana_suppboxplots_14FEB25.pptx")
+
+
